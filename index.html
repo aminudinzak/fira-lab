@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lab Maya : FIRA</title>
+
+    <style>
+      [x-cloak] {
+        display: none !important;
+      }
+    </style>
+  </head>
+
+  <body class="min-h-screen w-screen overflow-hidden bg-slate-950">
+    <main
+      x-data="filtrationLab()"
+      x-cloak
+      class="relative mx-auto flex aspect-video w-[min(100vw,177.78vh)] max-w-[1280px] overflow-hidden bg-slate-100 text-slate-900"
+    >
+
+    <!-- Tombol pojok kanan atas -->
+    <div class="absolute right-5 top-5 z-40 flex items-center gap-2">
+      <button
+        @click="showGuideModal = true"
+        class="flex items-center gap-2 rounded-2xl bg-white/90 px-4 py-2 text-xs font-black text-slate-800 shadow-lg transition hover:bg-white"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-4 w-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+          <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5z" />
+        </svg>
+        Panduan
+      </button>
+
+      <button
+        @click="showDeveloperModal = true"
+        class="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-sm font-black text-white shadow-lg transition hover:bg-slate-800"
+        title="Informasi Pengembang"
+      >
+        i
+      </button>
+    </div>
+      <!-- PANEL KIRI: KONTROL -->
+      <section class="flex w-[30%] flex-col bg-slate-900 p-4 text-white">
+        <!-- Jenis air -->
+        <div class="rounded-2xl bg-white/10 p-3">
+          <p class="text-xs font-bold text-slate-100">Jenis air</p>
+
+          <div class="mt-2 grid grid-cols-3 gap-2">
+            <button
+              @click="selectedWater = 'rainwater'; applyWaterPreset()"
+              :class="selectedWater === 'rainwater'
+                ? 'bg-cyan-400 text-slate-950'
+                : 'bg-slate-800 text-slate-300'"
+              class="rounded-xl px-2 py-2 text-[11px] font-bold transition"
+            >
+              Hujan
+            </button>
+
+            <button
+              @click="selectedWater = 'river'; applyWaterPreset()"
+              :class="selectedWater === 'river'
+                ? 'bg-cyan-400 text-slate-950'
+                : 'bg-slate-800 text-slate-300'"
+              class="rounded-xl px-2 py-2 text-[11px] font-bold transition"
+            >
+              Sungai
+            </button>
+
+            <button
+              @click="selectedWater = 'lake'; applyWaterPreset()"
+              :class="selectedWater === 'lake'
+                ? 'bg-cyan-400 text-slate-950'
+                : 'bg-slate-800 text-slate-300'"
+              class="rounded-xl px-2 py-2 text-[11px] font-bold transition"
+            >
+              Danau
+            </button>
+          </div>
+
+          <div class="mt-3 grid grid-cols-2 gap-2">
+            <div class="rounded-xl bg-slate-950/50 p-2">
+              <p class="text-[10px] text-slate-400">NTU awal</p>
+              <p class="text-lg font-black">
+                <span x-text="initialTurbidity"></span>
+              </p>
+            </div>
+
+            <div class="rounded-xl bg-slate-950/50 p-2">
+              <p class="text-[10px] text-slate-400">ppm awal</p>
+              <p class="text-lg font-black">
+                <span x-text="initialPollutant"></span>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Ketebalan filter -->
+        <div class="mt-3 flex-1 rounded-2xl bg-white/10 p-3">
+          <div class="flex items-center justify-between">
+            <p class="text-xs font-bold text-slate-100">
+              Ketebalan filter
+            </p>
+
+            <span class="rounded-full bg-cyan-400 px-3 py-1 text-[10px] font-black text-slate-950">
+              Total <span x-text="totalThickness"></span> cm
+            </span>
+          </div>
+
+          <div class="mt-3 space-y-2">
+            <template x-for="layer in layersArray" :key="layer.key">
+              <div class="rounded-xl bg-slate-950/45 px-3 py-2">
+                <div class="flex items-center justify-between gap-2">
+                  <p class="text-xs font-bold" x-text="layer.name"></p>
+
+                  <span class="rounded-full bg-white/10 px-2 py-1 text-[10px] font-bold">
+                    <span x-text="filterLayers[layer.key].thickness"></span> cm
+                  </span>
+                </div>
+
+                <input
+                  type="range"
+                  min="0"
+                  :max="layer.maxThickness"
+                  step="1"
+                  x-model.number="filterLayers[layer.key].thickness"
+                  class="mt-1 w-full accent-cyan-300"
+                />
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <div class="mt-3 grid grid-cols-2 gap-3">
+          <button
+            @click="startSimulation()"
+            :disabled="isRunning"
+            class="rounded-xl bg-cyan-400 px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <span x-show="!isRunning">Mulai</span>
+            <span x-show="isRunning">Proses...</span>
+          </button>
+
+          <button
+            @click="resetSimulation()"
+            class="rounded-xl border border-white/20 px-4 py-3 text-sm font-black text-white transition hover:bg-white/10"
+          >
+            Reset
+          </button>
+        </div>
+      </section>
+
+      <!-- AREA SIMULASI UTAMA -->
+      <section
+        class="relative flex w-[70%] flex-col bg-gradient-to-b from-sky-50 to-cyan-100 p-5"
+        style="
+          --air-awal-x: 5%;
+          --air-awal-y: 0%;
+          --air-awal-w: 9rem;
+          --air-awal-h: 10rem;
+
+          --filter-x: 35%;
+          --filter-y: 10%;
+          --filter-w: 10rem;
+          --filter-h: 24rem;
+
+          --hasil-x: 65%;
+          --hasil-y: 59%;
+          --hasil-w: 10rem;
+          --hasil-h: 11rem;
+
+          --pipa-masuk-x: 15%;
+          --pipa-masuk-y: 20%;
+          --pipa-masuk-w: 11rem;
+          --pipa-masuk-h: 1rem;
+
+          --pipa-keluar-x: 48%;
+          --pipa-keluar-y: 63%;
+          --pipa-keluar-w: 11rem;
+          --pipa-keluar-h: 1rem;
+        "
+      >
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h1 class="text-xl font-black text-slate-900">
+              FIRA: Filtrasi Interaktif untuk Reduksi Air Tercemar
+            </h1>
+            <p class="text-xs leading-relaxed text-slate-600">
+              Atur komposisi filter untuk menurunkan turbidity dan partikel pencemar air.
+            </p>
+          </div>
+        </div>
+
+        <div class="relative mt-4 flex flex-1 items-center justify-center">
+          <!-- Air awal -->
+          <!-- Air awal -->
+          <div
+            class="absolute z-10 rounded-2xl border-4 border-slate-300 bg-white shadow-lg"
+            style="
+              left: var(--air-awal-x);
+              top: var(--air-awal-y);
+              width: var(--air-awal-w);
+              height: var(--air-awal-h);
+            "
+          >
+            <div class="absolute left-0 right-0 top-0 rounded-t-xl bg-slate-100 px-2 py-1 text-center text-[10px] font-black text-slate-600">
+              Air Awal
+            </div>
+
+            <div
+              class="absolute bottom-0 left-0 right-0 rounded-b-xl transition-all duration-[1800ms] ease-in-out"
+              :style="`
+                height: ${sourceTankLevel}%;
+                background: ${initialWaterColor};
+              `"
+            ></div>
+
+            <div class="absolute bottom-5 left-0 right-0 text-center text-xs font-black text-slate-900">
+              <p>
+                <span x-text="initialTurbidity"></span> NTU
+              </p>
+              <p>
+                <span x-text="initialPollutant"></span> ppm
+              </p>
+            </div>
+          </div>
+
+          <!-- Pipa masuk -->
+          <div
+            class="absolute z-0 rounded-full bg-slate-300 shadow-inner"
+            style="
+              left: var(--pipa-masuk-x);
+              top: var(--pipa-masuk-y);
+              width: var(--pipa-masuk-w);
+              height: var(--pipa-masuk-h);
+            "
+          ></div>
+
+          <!-- Animasi aliran air -->
+          <template x-if="isRunning">
+            <div class="absolute left-[49%] top-[25%] z-20 flex flex-col items-center gap-1">
+              <div class="water-flow h-5 w-3 rounded-full bg-sky-400/80"></div>
+              <div class="water-flow h-5 w-3 rounded-full bg-sky-400/70 [animation-delay:0.25s]"></div>
+              <div class="water-flow h-5 w-3 rounded-full bg-sky-400/60 [animation-delay:0.5s]"></div>
+            </div>
+          </template>
+
+          <!-- Kolom filter -->
+          <div
+            class="absolute z-10 rounded-3xl border-4 border-slate-400 bg-white shadow-xl"
+            style="
+              left: var(--filter-x);
+              top: var(--filter-y);
+              width: var(--filter-w);
+              height: var(--filter-h);
+            "
+          >
+            <div class="absolute left-0 right-0 top-0 rounded-t-2xl bg-slate-700 py-2 text-center text-[10px] font-black uppercase tracking-widest text-white">
+              Filter Berlapis
+            </div>
+
+            <div class="absolute bottom-6 left-5 right-5 top-12 flex flex-col-reverse overflow-hidden rounded-2xl border border-slate-300 bg-slate-50">
+              <template x-if="totalThickness === 0">
+                <div class="flex h-full items-center justify-center px-2 text-center text-[10px] font-bold text-slate-400">
+                  Tanpa filter
+                </div>
+              </template>
+
+              <template x-for="layer in visibleLayers" :key="layer.key">
+                <div
+                  class="relative flex items-center justify-center border-t border-white/40 text-[9px] font-black text-slate-900 transition-all duration-500"
+                  :class="layer.color"
+                  :style="`height: ${(filterLayers[layer.key].thickness / Math.max(totalThickness, 1)) * 100}%`"
+                >
+                  <span
+                    class="rounded bg-white/60 px-1"
+                    x-text="layer.name"
+                  ></span>
+                </div>
+              </template>
+
+              <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle,rgba(15,23,42,0.15)_1px,transparent_1px)] bg-[length:10px_10px]"></div>
+            </div>
+
+            <div class="absolute bottom-1 left-0 right-0 text-center text-[10px] font-black text-slate-600">
+              Total <span x-text="totalThickness"></span> cm
+            </div>
+          </div>
+
+          <!-- Pipa keluar -->
+          <div
+            class="absolute z-0 rounded-full bg-slate-300 shadow-inner"
+            style="
+              left: var(--pipa-keluar-x);
+              top: var(--pipa-keluar-y);
+              width: var(--pipa-keluar-w);
+              height: var(--pipa-keluar-h);
+            "
+          ></div>
+
+          <!-- Hasil filtrasi -->
+          <div
+            class="absolute z-10 rounded-2xl border-4 border-slate-300 bg-white shadow-lg"
+            style="
+              left: var(--hasil-x);
+              top: var(--hasil-y);
+              width: var(--hasil-w);
+              height: var(--hasil-h);
+            "
+          >
+            <div class="absolute left-0 right-0 top-0 rounded-t-xl bg-slate-100 px-2 py-1 text-center text-[10px] font-black text-slate-600">
+              Hasil Filtrasi
+            </div>
+
+            <div
+              class="absolute bottom-0 left-0 right-0 rounded-b-xl transition-all duration-[1800ms] ease-in-out"
+              :style="`
+                height: ${resultTankLevel}%;
+                background: ${hasResult ? resultWaterColor : initialWaterColor};
+              `"
+            ></div>
+
+            <div class="absolute bottom-5 left-0 right-0 text-center text-xs font-black text-slate-900">
+              <template x-if="hasResult">
+                <div>
+                  <p>
+                    <span x-text="finalTurbidity.toFixed(1)"></span> NTU
+                  </p>
+                  <p>
+                    <span x-text="finalPollutant.toFixed(1)"></span> ppm
+                  </p>
+                </div>
+              </template>
+
+              <template x-if="!hasResult">
+                <div class="text-[11px] text-slate-500">
+                  Belum ada hasil
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tombol riwayat -->
+        <button
+          @click="showHistoryModal = true"
+          class="absolute bottom-5 right-5 z-40 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white shadow-xl transition hover:bg-slate-800"
+        >
+          Riwayat Praktikum
+        </button>
+      </section>
+
+      <!-- MODAL RIWAYAT PRAKTIKUM -->
+      <div
+        x-show="showHistoryModal"
+        x-transition.opacity
+        class="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-8"
+      >
+        <div
+          @click.outside="showHistoryModal = false"
+          class="w-[86%] rounded-3xl bg-white shadow-2xl"
+        >
+        <div class="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-600">
+              Data Praktikum
+            </p>
+            <h2 class="text-xl font-black text-slate-900">
+              Riwayat Percobaan Filtrasi
+            </h2>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button
+              @click="clearHistory()"
+              :disabled="trials.length === 0"
+              class="rounded-xl bg-rose-100 px-4 py-2 text-sm font-black text-rose-700 transition hover:bg-rose-200 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Hapus Riwayat
+            </button>
+
+            <button
+              @click="showHistoryModal = false"
+              class="rounded-xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-200"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+
+          <div class="p-6">
+            <div class="overflow-hidden rounded-2xl border border-slate-200">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-100 text-slate-600">
+                  <tr>
+                    <th class="px-3 py-3">No</th>
+                    <th class="px-3 py-3">Air</th>
+                    <th class="px-3 py-3">Total</th>
+                    <th class="px-3 py-3">Kerikil</th>
+                    <th class="px-3 py-3">Silika</th>
+                    <th class="px-3 py-3">Zeolit</th>
+                    <th class="px-3 py-3">Arang</th>
+                    <th class="px-3 py-3">Kapas</th>
+                    <th class="px-3 py-3">NTU</th>
+                    <th class="px-3 py-3">ppm</th>
+                    <th class="px-3 py-3">↓ NTU</th>
+                    <th class="px-3 py-3">↓ ppm</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  <template x-if="trials.length === 0">
+                    <tr>
+                      <td colspan="12" class="px-4 py-10 text-center text-slate-400">
+                        Belum ada riwayat praktikum. Jalankan simulasi terlebih dahulu.
+                      </td>
+                    </tr>
+                  </template>
+
+                  <template x-for="trial in trials" :key="trial.id">
+                    <tr class="border-t border-slate-100">
+                      <td class="px-3 py-3 font-bold" x-text="trial.id"></td>
+                      <td class="px-3 py-3" x-text="trial.water"></td>
+                      <td class="px-3 py-3">
+                        <span x-text="trial.totalThickness"></span> cm
+                      </td>
+                      <td class="px-3 py-3">
+                        <span x-text="trial.gravel"></span> cm
+                      </td>
+                      <td class="px-3 py-3">
+                        <span x-text="trial.silicaSand"></span> cm
+                      </td>
+                      <td class="px-3 py-3">
+                        <span x-text="trial.zeolite"></span> cm
+                      </td>
+                      <td class="px-3 py-3">
+                        <span x-text="trial.activatedCarbon"></span> cm
+                      </td>
+                      <td class="px-3 py-3">
+                        <span x-text="trial.cotton"></span> cm
+                      </td>
+                      <td class="px-3 py-3 font-black text-cyan-700">
+                        <span x-text="trial.finalTurbidity"></span>
+                      </td>
+                      <td class="px-3 py-3 font-black text-rose-700">
+                        <span x-text="trial.finalPollutant"></span>
+                      </td>
+                      <td class="px-3 py-3 font-black text-emerald-700">
+                        <span x-text="trial.turbidityReduction"></span>%
+                      </td>
+                      <td class="px-3 py-3 font-black text-emerald-700">
+                        <span x-text="trial.pollutantReduction"></span>%
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+
+            <p class="mt-4 text-xs leading-relaxed text-slate-500">
+              Data ini menunjukkan hubungan antara ketebalan lapisan filter,
+              nilai turbidity akhir, dan konsentrasi partikel pencemar akhir.
+            </p>
+          </div>
+        </div>
+      </div>
+
+<!-- MODAL PANDUAN -->
+<div
+  x-show="showGuideModal"
+  x-transition.opacity
+  class="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-8"
+>
+  <div
+    @click.outside="showGuideModal = false"
+    class="w-[58%] rounded-3xl bg-white shadow-2xl"
+  >
+    <div class="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-600">
+          Panduan Praktikum
+        </p>
+        <h2 class="text-xl font-black text-slate-900">
+          Cara Menggunakan Lab Maya
+        </h2>
+      </div>
+
+      <button
+        @click="showGuideModal = false"
+        class="rounded-xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-200"
+      >
+        Tutup
+      </button>
+    </div>
+
+    <div class="space-y-4 p-6 text-sm leading-relaxed text-slate-700">
+      <div class="rounded-2xl bg-slate-50 p-4">
+        <p class="font-black text-slate-900">1. Pilih jenis air</p>
+        <p class="mt-1">
+          Pilih salah satu sampel air: air hujan, air sungai, atau air danau.
+          Setiap jenis air memiliki nilai awal NTU dan ppm yang berbeda.
+        </p>
+      </div>
+
+      <div class="rounded-2xl bg-slate-50 p-4">
+        <p class="font-black text-slate-900">2. Atur ketebalan filter</p>
+        <p class="mt-1">
+          Geser slider pada masing-masing lapisan filter. Nilai 0 cm berarti
+          filter tersebut tidak digunakan. Semakin tebal lapisan, semakin besar
+          pengaruhnya terhadap penurunan NTU dan ppm.
+        </p>
+      </div>
+
+      <div class="rounded-2xl bg-slate-50 p-4">
+        <p class="font-black text-slate-900">3. Jalankan simulasi</p>
+        <p class="mt-1">
+          Tekan tombol <strong>Mulai</strong> untuk menjalankan proses filtrasi.
+          Amati perubahan nilai NTU dan ppm pada wadah hasil filtrasi.
+        </p>
+      </div>
+
+      <div class="rounded-2xl bg-slate-50 p-4">
+        <p class="font-black text-slate-900">4. Buka riwayat praktikum</p>
+        <p class="mt-1">
+          Gunakan tombol <strong>Riwayat Praktikum</strong> untuk melihat tabel
+          data hasil percobaan yang sudah dilakukan.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL INFORMASI PENGEMBANG -->
+<div
+  x-show="showDeveloperModal"
+  x-transition.opacity
+  class="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-8"
+>
+  <div
+    @click.outside="showDeveloperModal = false"
+    class="w-[46%] rounded-3xl bg-white shadow-2xl"
+  >
+    <div class="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+      <div>
+        <h2 class="text-xl font-black text-slate-900">
+          Informasi Pengembang
+        </h2>
+      </div>
+
+      <button
+        @click="showDeveloperModal = false"
+        class="rounded-xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-200"
+      >
+        Tutup
+      </button>
+    </div>
+
+    <div class="p-6">
+      <div class="rounded-3xl bg-slate-900 p-6 text-white">
+        <div class="flex items-center gap-4">
+
+          <div>
+            <p class="text-xl font-black">
+              Aminudin Zakaria, S.Pd.
+            </p>
+            <p class="mt-1 text-sm text-slate-300">
+              Mahasiswa S2 Pendidikan Sains Universitas Negeri Surabaya
+            </p>
+          </div>
+        </div>
+
+        <div class="mt-5 rounded-2xl bg-white/10 p-4">
+          <p class="text-xs text-slate-400">Kontak</p>
+          <p class="mt-1 text-sm font-bold">
+            aminudinzak@gmail.com
+          </p>
+        </div>
+
+        <div class="mt-3 grid grid-cols-2 gap-3 text-sm">
+          <div class="rounded-2xl bg-white/10 p-4">
+            <p class="text-xs text-slate-400">Produk</p>
+            <p class="mt-1 font-bold">Lab Maya Filtrasi Air</p>
+          </div>
+
+          <div class="rounded-2xl bg-white/10 p-4">
+            <p class="text-xs text-slate-400">Teknologi</p>
+            <p class="mt-1 font-bold">Alpine.js, Tailwind CSS, Vite</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- MODAL SELAMAT DATANG -->
+<div
+  x-show="showWelcomeModal"
+  x-transition.opacity
+  class="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-8"
+>
+  <div
+    x-transition.scale
+    class="w-[52%] rounded-3xl bg-white shadow-2xl"
+  >
+    <div class="rounded-t-3xl bg-slate-900 px-6 py-5 text-white">
+      <p class="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">
+        Selamat Datang
+      </p>
+
+      <h2 class="mt-2 text-2xl font-black">
+        FIRA Lab
+      </h2>
+
+      <p class="mt-1 text-sm text-slate-300">
+        Filtrasi Interaktif untuk Reduksi Air Tercemar
+      </p>
+    </div>
+
+    <div class="space-y-4 p-6">
+      <p class="text-sm leading-relaxed text-slate-700">
+        Pada lab maya ini, kamu akan menguji bagaimana ketebalan beberapa
+        lapisan filter memengaruhi penurunan turbidity air dan konsentrasi
+        partikel pencemar.
+      </p>
+
+      <div class="grid grid-cols-3 gap-3">
+        <div class="rounded-2xl bg-cyan-50 p-4">
+          <p class="text-xs font-bold text-cyan-700">
+            1. Pilih Air
+          </p>
+          <p class="mt-1 text-xs leading-relaxed text-slate-600">
+            Gunakan air hujan, air sungai, atau air danau.
+          </p>
+        </div>
+
+        <div class="rounded-2xl bg-emerald-50 p-4">
+          <p class="text-xs font-bold text-emerald-700">
+            2. Atur Filter
+          </p>
+          <p class="mt-1 text-xs leading-relaxed text-slate-600">
+            Atur ketebalan kerikil, silika, zeolit, arang aktif, dan kapas.
+          </p>
+        </div>
+
+        <div class="rounded-2xl bg-rose-50 p-4">
+          <p class="text-xs font-bold text-rose-700">
+            3. Amati Hasil
+          </p>
+          <p class="mt-1 text-xs leading-relaxed text-slate-600">
+            Bandingkan nilai NTU dan ppm sebelum dan sesudah filtrasi.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between rounded-2xl bg-slate-100 p-4">
+        <p class="text-xs leading-relaxed text-slate-600">
+          Tekan tombol mulai untuk menjalankan simulasi, lalu buka riwayat
+          praktikum untuk melihat data percobaan.
+        </p>
+
+        <button
+          @click="showWelcomeModal = false"
+          class="ml-4 shrink-0 rounded-2xl bg-cyan-400 px-5 py-3 text-sm font-black text-slate-950 transition hover:bg-cyan-300"
+        >
+          Mulai Eksplorasi
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+      <script type="module" src="/src/main.js"></script>
+    </main>
+  </body>
+</html>
